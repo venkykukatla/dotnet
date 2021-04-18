@@ -1,0 +1,57 @@
+{
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "triggers": {
+        "Recurrence": {
+            "recurrence": {
+                "frequency": "Week",
+                "interval": 1,
+                "schedule": {
+                    "weekDays": [
+                        "Monday",
+                        "Tuesday",
+                        "Wednesday",
+                        "Thursday",
+                        "Friday"
+                    ]
+                },
+                "startTime": "2017-03-24T03:00:00z"
+            },
+            "type": "Recurrence"
+        }
+    },
+    "actions": {
+        "LMEConnection": {
+            "runAfter": {},
+            "type": "Workflow",
+            "inputs": {
+                "body": "lmecconnection",
+                "host": {
+                    "triggerName": "manual",
+                    "workflow": {
+                        "id": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/resourceGroups/tkmxadshedgdrg/providers/Microsoft.Logic/workflows/LMEConnection"
+                    }
+                }
+            }
+        },
+        "LMEWebserviceAPI": {
+            "runAfter": {
+                "LMEConnection": [
+                    "Succeeded"
+                ]
+            },
+            "type": "Workflow",
+            "inputs": {
+                "body": "LMEWebservice",
+                "host": {
+                    "triggerName": "manual",
+                    "workflow": {
+                        "id": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/resourceGroups/tkmxadshedgdrg/providers/Microsoft.Logic/workflows/LMEWebserviceAPI"
+                    }
+                }
+            }
+        }
+    },
+    "outputs": {}
+}
