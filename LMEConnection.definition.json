@@ -1,0 +1,448 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_LMEConnection_name": {
+            "defaultValue": "LMEConnection",
+            "type": "string"
+        },
+        "workflows_LMEConnection_parameters_$connections": {
+            "defaultValue": {
+                "azureblob": {
+                    "connectionId": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/resourceGroups/tkmxadshedgdrg/providers/Microsoft.Web/connections/azureblob",
+                    "connectionName": "azureblob",
+                    "id": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/providers/Microsoft.Web/locations/germanywestcentral/managedApis/azureblob"
+                },
+                "sql": {
+                    "connectionId": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/resourceGroups/tkmxadshedgdrg/providers/Microsoft.Web/connections/sql-3",
+                    "connectionName": "sql-3",
+                    "id": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/providers/Microsoft.Web/locations/germanywestcentral/managedApis/sql"
+                }
+            },
+            "type": "Object"
+        }
+    },
+    "resources": [
+        {
+            "apiVersion": "2017-07-01",
+            "dependsOn": [],
+            "location": "germanywestcentral",
+            "name": "[parameters('workflows_LMEConnection_name')]",
+            "properties": {
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {
+                                "azureblob": {
+                                    "connectionId": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/resourceGroups/tkmxadshedgdrg/providers/Microsoft.Web/connections/azureblob",
+                                    "connectionName": "azureblob",
+                                    "id": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/providers/Microsoft.Web/locations/germanywestcentral/managedApis/azureblob"
+                                },
+                                "sql": {
+                                    "connectionId": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/resourceGroups/tkmxadshedgdrg/providers/Microsoft.Web/connections/sql-3",
+                                    "connectionName": "sql-3",
+                                    "id": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/providers/Microsoft.Web/locations/germanywestcentral/managedApis/sql"
+                                }
+                            },
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "manual": {
+                            "type": "Request",
+                            "kind": "Http",
+                            "inputs": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "actions": {
+                        "Compose": {
+                            "runAfter": {
+                                "HTTP_2": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Compose",
+                            "inputs": "@Json(body('HTTP_2'))"
+                        },
+                        "Compose_2": {
+                            "runAfter": {
+                                "Initialize_variable_2": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Compose",
+                            "inputs": "@json(variables('ReadLMEResponseinstring'))"
+                        },
+                        "Create_CSV_table": {
+                            "runAfter": {
+                                "Compose": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Table",
+                            "inputs": {
+                                "columns": [
+                                    {
+                                        "header": "Code",
+                                        "value": "@item()?['@code']"
+                                    },
+                                    {
+                                        "header": "currency",
+                                        "value": "@item()?['currency']"
+                                    },
+                                    {
+                                        "header": "of_item",
+                                        "value": "@item()?['of_item']"
+                                    }
+                                ],
+                                "format": "CSV",
+                                "from": "@outputs('Compose')['lme']['officials']['row_official']"
+                            }
+                        },
+                        "Create_HTML_table": {
+                            "runAfter": {
+                                "Compose_2": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Table",
+                            "inputs": {
+                                "format": "HTML",
+                                "from": "@array(outputs('Compose_2'))"
+                            }
+                        },
+                        "Create_blob": {
+                            "runAfter": {
+                                "Create_CSV_table": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": "@body('Create_CSV_table')",
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['azureblob']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/files",
+                                "queries": {
+                                    "folderPath": "/hedgingsink/Logicapp/raw/@{substring(formatDateTime(utcNow('yyyy-MM-dd')),0,10)}",
+                                    "name": "DailyLoad.csv",
+                                    "queryParametersSingleEncoded": true
+                                }
+                            },
+                            "runtimeConfiguration": {
+                                "contentTransfer": {
+                                    "transferMode": "Chunked"
+                                }
+                            }
+                        },
+                        "Execute_stored_procedure_(V2)": {
+                            "runAfter": {
+                                "Insert_row_(V2)_2": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {},
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('default'))},@{encodeURIComponent(encodeURIComponent('default'))}/procedures/@{encodeURIComponent(encodeURIComponent('[Landing].[usp_merge_prices_to_hedginglist]'))}"
+                            }
+                        },
+                        "GetBody": {
+                            "runAfter": {
+                                "HTTP": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "TokenValue",
+                                        "type": "object",
+                                        "value": "@body('HTTP')"
+                                    }
+                                ]
+                            }
+                        },
+                        "HTTP": {
+                            "runAfter": {},
+                            "type": "Http",
+                            "inputs": {
+                                "body": "grant_type=password&username=paulina.pawlowski@thyssenkrupp-materials.com&password=Hedging2021!&client_id=xmlfeeds",
+                                "headers": {
+                                    "Content-Type": "application/x-www-form-urlencoded"
+                                },
+                                "method": "POST",
+                                "uri": "https://sso.lmelive.com/as/token.oauth2"
+                            }
+                        },
+                        "HTTP_2": {
+                            "runAfter": {
+                                "Initialize_variable": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "headers": {
+                                    "Authorization": "Bearer @{variables('GetToken')}"
+                                },
+                                "method": "GET",
+                                "uri": "https://ndxml.lmelive.com/XMLFeed.svc/lme.xml?contract=AH|CA|NI&type=OFS"
+                            }
+                        },
+                        "Initialize_variable": {
+                            "runAfter": {
+                                "GetBody": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "GetToken",
+                                        "type": "string",
+                                        "value": "@{variables('TokenValue')['access_token']}"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_10": {
+                            "runAfter": {
+                                "Initialize_variable_9": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "GetOfficials",
+                                        "type": "object",
+                                        "value": "@variables('Saveobjectlme')['officials']"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_11": {
+                            "runAfter": {
+                                "Initialize_variable_10": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "row_official",
+                                        "type": "string",
+                                        "value": "@{variables('GetOfficials')['row_official']}"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_2": {
+                            "runAfter": {
+                                "Create_blob": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "ReadLMEResponseinstring",
+                                        "type": "string",
+                                        "value": "@{outputs('Compose')}"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_3": {
+                            "runAfter": {
+                                "Create_HTML_table": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "SplitString",
+                                        "type": "array",
+                                        "value": "@split(body('Create_CSV_table'),',')"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_4": {
+                            "runAfter": {
+                                "Initialize_variable_3": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "SaveAHPrice",
+                                        "type": "string",
+                                        "value": "@{substring(variables('SplitString')[9],10,7)}"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_5": {
+                            "runAfter": {
+                                "Initialize_variable_4": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "SaveCAPrice",
+                                        "type": "string",
+                                        "value": "@{substring(variables('SplitString')[28],10,7)}"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_6": {
+                            "runAfter": {
+                                "Initialize_variable_5": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "SaveNIPrice",
+                                        "type": "string",
+                                        "value": "@{substring(variables('SplitString')[47],10,7)}"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_7": {
+                            "runAfter": {
+                                "Initialize_variable_6": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "Saveobject",
+                                        "type": "object",
+                                        "value": "@outputs('Compose_2')"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_8": {
+                            "runAfter": {
+                                "Initialize_variable_7": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "Saveobjectlme",
+                                        "type": "object",
+                                        "value": "@variables('Saveobject')['lme']"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_9": {
+                            "runAfter": {
+                                "Initialize_variable_8": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "Getdate",
+                                        "type": "string",
+                                        "value": "@{variables('Saveobjectlme')['date']}"
+                                    }
+                                ]
+                            }
+                        },
+                        "Insert_row_(V2)_2": {
+                            "runAfter": {
+                                "Initialize_variable_11": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "Al": "@variables('SaveAHPrice')",
+                                    "CA": "@variables('SaveCAPrice')",
+                                    "Currency": "USD",
+                                    "Loaddate": "@variables('Getdate')",
+                                    "NI": "@variables('SaveNIPrice')"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('default'))},@{encodeURIComponent(encodeURIComponent('default'))}/tables/@{encodeURIComponent(encodeURIComponent('[RAW].[prices]'))}/items"
+                            }
+                        },
+                        "Response": {
+                            "runAfter": {
+                                "Execute_stored_procedure_(V2)": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Response",
+                            "kind": "Http",
+                            "inputs": {
+                                "body": "This got completed successfully",
+                                "statusCode": 200
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": "[parameters('workflows_LMEConnection_parameters_$connections')]"
+                    }
+                },
+                "state": "Enabled"
+            },
+            "scale": null,
+            "tags": {},
+            "type": "Microsoft.Logic/workflows"
+        }
+    ],
+    "variables": {}
+}

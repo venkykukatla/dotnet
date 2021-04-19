@@ -1,0 +1,23 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_LMEConnection_name": {
+            "value": "LMEConnection"
+        },
+        "workflows_LMEConnection_parameters_$connections": {
+            "value": {
+                "azureblob": {
+                    "connectionId": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/resourceGroups/tkmxadshedgdrg/providers/Microsoft.Web/connections/azureblob",
+                    "connectionName": "azureblob",
+                    "id": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/providers/Microsoft.Web/locations/germanywestcentral/managedApis/azureblob"
+                },
+                "sql": {
+                    "connectionId": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/resourceGroups/tkmxadshedgdrg/providers/Microsoft.Web/connections/sql-3",
+                    "connectionName": "sql-3",
+                    "id": "/subscriptions/c1ee313e-1ec1-4a43-b44d-f4f03641bca5/providers/Microsoft.Web/locations/germanywestcentral/managedApis/sql"
+                }
+            }
+        }
+    }
+}
